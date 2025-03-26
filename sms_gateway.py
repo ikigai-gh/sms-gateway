@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 
 import os
+import sys
 import requests as r
 import time
 from xml.etree import ElementTree as ET
@@ -48,18 +49,36 @@ class Message:
         return self.__content
 
 # NB: Set up a routing in order to access the Internet
-def tg_send_sms(text):
-    data = dict(chat_id=TG_CHAN_ID, text=text)
-    resp = r.post(TG_URL, json=data)
+def tg_send_sms(sms):
+    data = dict(chat_id=TG_CHAN_ID, text=sms.date + "\n" + sms.sender + "\n" + sms.content)
+    try:
+        resp = r.post(TG_URL, json=data)
+        if resp.status_code != r.codes.ok:
+            logger.error(f"Error while sending sms {sms.index}")
+    except (ConnectionError, TimeoutError):
+        logging.error("Error while dealing with Telegram Api")
+        sys.exit(1)
 
-def delete_sms(index):
-    delete_sms_req = f'<?xml version="1.0" encoding="UTF-8"?><request><Index>{index}</Index></request>'
-    resp = r.post(DELETE_SMS_URL, data=delete_sms_req)
+def delete_sms(sms):
+    delete_sms_req = f'<?xml version="1.0" encoding="UTF-8"?><request><Index>{sms.index}</Index></request>'
+    try:
+        resp = r.post(DELETE_SMS_URL, data=delete_sms_req)
+        if resp.status_code != r.codes.ok:
+            logger.error(f"Error while deleting sms {sms.index}")
+    except (ConnectionError, TimeoutError):
+        logging.error(f"Error while trying to delete sms {sms.index}")
+        sys.exit(1)
 
 def get_last_msg():
-    resp = r.post(LIST_SMS_URL, data=LIST_SMS)
-    resp.encoding = "UTF-8"
-    xml_data = ET.fromstring(resp.text)
+    try:
+        resp = r.post(LIST_SMS_URL, data=LIST_SMS)
+        if resp.status_code != r.codes.ok:
+            logger.error(f"Error while getting last sms")
+        resp.encoding = "UTF-8"
+        xml_data = ET.fromstring(resp.text)
+    except (ConnectionError, TimeoutError):
+        logging.error("Error while trying to get sms from 192.168.8.1")
+        sys.exit(1)
     return xml_data
 
 def receive_sms():
@@ -71,12 +90,16 @@ def receive_sms():
         if sms_count > 0:
             msg = Message(xml_data)
             logger.info(f"Received sms {msg.index} from {msg.sender}")
-            tg_send_sms(msg.date + "\n" + msg.sender + "\n" + msg.content)
+            tg_send_sms(msg)
             logger.info(f"Sent sms {msg.index} to telegram")
-            delete_sms(msg.index)
+            delete_sms(msg)
             logger.info(f"Deleted sms {msg.index} from {msg.sender}")
 
         time.sleep(3)
 
 if __name__ == "__main__":
-    receive_sms()
+    if TG_BOT_TOKEN and TG_CHAN_ID:
+        receive_sms()
+    else:
+        logging.error("Bot token and/or channel id not found!")
+        sys.exit(1)
