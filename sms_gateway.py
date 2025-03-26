@@ -26,10 +26,10 @@ DELETE_SMS_URL = "http://192.168.8.1/api/sms/delete-sms"
 
 class Message:
     def __init__(self, xml_root):
-        self.__index = xml_root[1][0][1].text
-        self.__date = xml_root[1][0][4].text
-        self.__sender = xml_root[1][0][2].text
-        self.__content = xml_root[1][0][3].text
+        self.__index = xml_root.find(".//Messages/Message/Index").text
+        self.__date = xml_root.find(".//Messages/Message/Date").text
+        self.__sender = xml_root.find(".//Messages/Message/Phone").text
+        self.__content = xml_root.find(".//Messages/Message/Content").text
 
     @property
     def index(self):
@@ -66,7 +66,7 @@ def receive_sms():
     logger.info(f"Started receiving sms from {LIST_SMS_URL}")
     while True:
         xml_data = get_last_msg()
-        sms_count = int(xml_data[0].text)
+        sms_count = int(xml_data.find(".//Count").text)
 
         if sms_count > 0:
             msg = Message(xml_data)
