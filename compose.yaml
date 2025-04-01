@@ -4,4 +4,4 @@ services:
     image: sms_gateway:0.1.0
     container_name: sms_gateway
     env_file: .env
-    restart: on-failure:5
+    restart: on-failure
